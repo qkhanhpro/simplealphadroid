@@ -1,0 +1,93 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SimpleAlphaDroid debug</title>
+<style>
+body{background:#111;color:#ddd;font:14px system-ui,sans-serif;margin:0;padding:8px}
+button,select,input{background:#262626;color:#eee;border:1px solid #444;border-radius:6px;padding:9px 10px;margin:2px;font-size:14px}
+button:active{background:#3a5}
+input{width:70px}
+.row{display:flex;flex-wrap:wrap;align-items:center;margin:4px 0}
+#wrap{position:relative;width:100%;background:#000;min-height:120px}
+#lv{width:100%;display:block;touch-action:none}
+#mark{position:absolute;width:24px;height:24px;border:2px solid #0f0;margin:-14px 0 0 -14px;pointer-events:none;display:none}
+#st{font-family:monospace;font-size:12px;color:#8d8;white-space:pre-wrap}
+pre{background:#000;color:#bbb;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-all;padding:4px}
+h4{margin:10px 0 2px;color:#9bf}
+#hold{background:#553}
+#hold.on{background:#a83}
+.big{padding:16px 18px;font-size:16px;font-weight:600}
+#afon{background:#235}#afon.on{background:#3a5}
+#bbf.on{background:#a83}
+</style></head><body>
+<div id="st">loading...</div>
+<div class="row"><button onclick="api('connect')">Connect</button><button onclick="api('refresh')">Reload props</button>
+<button id="lvbtn" onclick="toggleLv()">Start LV</button>
+<select id="lvq" onchange="lvQChanged()"><option value="small">LV Small (512px, weak Wi-Fi)</option><option value="med" selected>LV Medium (1024px)</option><option value="full">LV Full (camera original)</option></select><a href="/info" style="color:#9bf">/info</a>&nbsp;<a href="/log" style="color:#9bf">/log</a>&nbsp;<a href="/" style="color:#9bf">remote</a></div>
+<div id="wrap"><img id="lv" alt=""><div id="mark"></div></div>
+<div class="row">tap sends <select id="tapMode"><option value="afpos">set prop 0xD232 AF Area Position (USB v200)</option><option value="touch">ctrl 0xD2E4 RemoteTouch</option><option value="afarea">ctrl 0xD2DC AFAreaPosition</option></select>
+<button onclick="api('canceltouch')">Cancel touch</button></div>
+<h4>Back-button focus</h4>
+<div class="row"><button id="bbf" onclick="api('bbf',{on:bbfOn?0:1})">BBF mode: OFF</button>
+<button id="afon" class="big">AF-ON (hold)</button><button class="big" onclick="api('shutter')">Shutter (no AF)</button></div>
+<div class="row"><button id="hold">Half-press (hold)</button><button onclick="api('shoot')">Shoot</button>
+<button onclick="api('s2',{down:1})">S2 down</button><button onclick="api('s2',{down:0})">S2 up</button></div>
+<h4>Manual focus (NearFar 0xD2D1)</h4>
+<div class="row" id="nf"></div>
+<div class="row"><button onclick="api('step',{dir:'near'})">Step Near 0xD2D7</button><button onclick="api('step',{dir:'far'})">Step Far 0xD2D8</button></div>
+<h4>Helpers (SetExtDevicePropValue 0x9205)</h4>
+<div class="row">Focus mode 0x500A <select id="fm"><option value="1">MF</option><option value="2">AF-S</option><option value="0x8004">AF-C</option><option value="0x8005">AF-A</option><option value="0x8006">DMF</option></select><button onclick="setp(0x500A,'fm')">Set</button></div>
+<div class="row">Focus area 0xD22C <select id="fa"><option value="1">Wide</option><option value="2">Zone</option><option value="3">Center</option><option value="0x101">Flex S</option><option value="0x102">Flex M</option><option value="0x103">Flex L</option><option value="0x104">Expand flex</option><option value="0x105">Flex spot</option><option value="0x204">LockOn flex S</option></select><button onclick="setp(0xD22C,'fa')">Set</button></div>
+<div class="row">Touch func 0xD283 <select id="tf"><option value="1">Off</option><option value="2">Touch shutter</option><option value="3" selected>Touch focus</option><option value="4">Touch tracking</option></select><button onclick="setp(0xD283,'tf')">Set</button></div>
+<div class="row">Position key 0xD25A <select id="pk"><option value="0">Camera</option><option value="1">PC remote</option></select><button onclick="setp(0xD25A,'pk')">Set</button>
+LV quality 0xD26A <select id="lq"><option value="1">Low</option><option value="2">High</option></select><button onclick="setp(0xD26A,'lq')">Set</button></div>
+<h4>Raw</h4>
+<div class="row">op <input id="rop" value="0x9207"> params <input id="rp" value="0xD2C1" style="width:120px"> value <input id="rv" value="2"> size <input id="rs" value="2" style="width:40px"></div>
+<div class="row">hex data (overrides value/size) <input id="rh" style="width:160px"><button onclick="raw()">Send raw</button>
+<button onclick="ctl()">ctrl(code=params,value,size)</button><button onclick="setRaw()">set(code=params,value,size)</button></div>
+<pre id="out"></pre>
+<h4>Log</h4>
+<pre id="log"></pre>
+<script>
+const $=id=>document.getElementById(id);
+function q(o){return Object.entries(o||{}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')}
+async function api(c,o){try{const r=await fetch('/api/'+c+'?'+q(o),{method:'POST'});const t=await r.text();$('out').textContent=c+' '+JSON.stringify(o||{})+' -> '+t;return t}catch(e){$('out').textContent='ERR '+e}}
+function setp(code,sel){api('set',{code:'0x'+code.toString(16),value:$(sel).value})}
+function raw(){api('raw',{op:$('rop').value,p:$('rp').value,value:$('rv').value,size:$('rs').value,hex:$('rh').value})}
+function ctl(){api('ctrl',{code:$('rp').value,value:$('rv').value,size:$('rs').value})}
+function setRaw(){api('set',{code:$('rp').value,value:$('rv').value,size:$('rs').value})}
+[-7,-5,-3,-1,1,3,5,7].forEach(v=>{const b=document.createElement('button');b.textContent=(v<0?'Near ':'Far +')+v;b.onclick=()=>api('nearfar',{v:v});$('nf').appendChild(b)});
+const hold=$('hold');
+// In BBF mode the camera sits in MF, so a plain half-press can't focus: route it through AF-ON instead.
+let holdVia='s1';
+hold.addEventListener('pointerdown',e=>{e.preventDefault();hold.classList.add('on');holdVia=bbfOn?'afon':'s1';api(holdVia,{down:1})});
+['pointerup','pointercancel','pointerleave'].forEach(t=>hold.addEventListener(t,()=>{if(hold.classList.contains('on')){hold.classList.remove('on');api(holdVia,{down:0})}}));
+const afon=$('afon');let bbfOn=false;
+afon.addEventListener('pointerdown',e=>{e.preventDefault();afon.classList.add('on');api('afon',{down:1})});
+['pointerup','pointercancel','pointerleave'].forEach(t=>afon.addEventListener(t,()=>{if(afon.classList.contains('on')){afon.classList.remove('on');api('afon',{down:0})}}));
+let lvOn=false;
+function lvUrl(){return '/stream?q='+$('lvq').value+'&t='+Date.now()}
+try{const s=localStorage.getItem('lvq');if(s)$('lvq').value=s}catch(e){}
+function lvQChanged(){try{localStorage.setItem('lvq',$('lvq').value)}catch(e){}if(lvOn)$('lv').src=lvUrl()}
+function toggleLv(){lvOn=!lvOn;$('lvbtn').textContent=lvOn?'Stop LV':'Start LV';if(lvOn)$('lv').src=lvUrl();else $('lv').removeAttribute('src')}
+$('lv').onerror=()=>{if(lvOn)setTimeout(()=>{if(lvOn)$('lv').src=lvUrl()},2000)};
+$('lv').addEventListener('click',e=>{
+  const im=$('lv'),r=im.getBoundingClientRect();if(!r.width)return;
+  const fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+  const x=Math.max(0,Math.min(639,Math.round(fx*640))),y=Math.max(0,Math.min(479,Math.round(fy*480)));
+  const m=$('mark');m.style.display='block';m.style.left=(fx*100)+'%';m.style.top=(e.clientY-r.top)+'px';
+  api($('tapMode').value,{x:x,y:y});
+});
+let lastSeq=-1;
+async function poll(){
+  try{const s=await (await fetch('/api/status')).json();
+    bbfOn=!!s.bbf;$('bbf').textContent='BBF mode: '+(bbfOn?'ON':'OFF');$('bbf').className=bbfOn?'on':'';hold.textContent=bbfOn?'Half-press (= AF-ON)':'Half-press (hold)';
+    let t=(s.connected?'CONNECTED ':'not connected ')+s.model+' | '+s.status+' | LV '+s.fps+'fps '+s.lv+' viewers '+s.viewers+'\n';
+    for(const [k,v] of Object.entries(s.props))t+=k+' '+v.n+'='+v.v+(v.en!==1?' (en '+v.en+')':'')+'\n';
+    $('st').textContent=t;
+    if(s.logSeq!==lastSeq){lastSeq=s.logSeq;const lg=$('log');const atB=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-20;
+      lg.textContent=await (await fetch('/log?n=150')).text();if(atB)lg.scrollTop=lg.scrollHeight}
+  }catch(e){$('st').textContent='status error '+e}
+  setTimeout(poll,1000);
+}
+poll();
+</script></body></html>

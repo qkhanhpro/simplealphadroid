@@ -1,0 +1,52 @@
+0x5004 Image Compression
+0x5005 White Balance
+0x5007 Aperture (F-number x100)
+0x500A Focus Mode
+0x500B Metering Mode
+0x500C Flash Mode
+0x500E Exposure Program
+0x5010 Exposure Compensation (x1000)
+0x5013 Drive Mode
+0xD200 Flash Compensation
+0xD201 Dynamic Range Optimizer
+0xD203 Image Size
+0xD20D Shutter Speed (num<<16|den)
+0xD20E Battery Level (bars)
+0xD20F Color Temperature
+0xD210 White Balance Shift G-M
+0xD211 Aspect Ratio
+0xD212 Unknown 0xD212
+0xD213 Focus Indicator
+0xD214 Zoom
+0xD215 Shots Waiting For Host (bit15 + count)
+0xD217 AE Lock Indicator
+0xD218 Battery Percent
+0xD219 Sensor Crop (APS-C/Full)
+0xD21B Picture Effect
+0xD21C White Balance Shift A-B
+0xD21D Movie Recording State
+0xD21E ISO
+0xD21F FE Lock Indicator
+0xD220 Audio Signals
+0xD221 Live View State
+0xD222 PC Remote Save Destination
+0xD22C Focus Area
+0xD22D Magnifier State
+0xD22E Magnifier Unknown 0xD22E
+0xD22F Magnifier Ratio (x10)
+0xD230 Magnifier Position (x<<16|y)
+0xD231 Live View Display Effect
+0xD232 Focus Point Position (x<<16|y)
+0xD233 Magnifier Available
+0xD235 Manual Focus Adjust Available
+0xD236 Unknown 0xD236
+0xD24C Focus Distance
+0xD24E AWB Lock Indicator
+0xD24F Interval Shooting
+0xD250 Unknown 0xD250
+0xD25A Priority Mode (camera/PC)
+0xD264 Remote Control Restriction
+0xD26A Live View Quality
+0xD283 Touch Operation Mode
+0xD284 Touch Operation Available
+0xD285 Touch Operation State

@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Release signing. Locally: .local/signing/signing.properties (private, git-ignored).
+// On CI: environment variables SIGNING_STORE_FILE / SIGNING_STORE_PASSWORD / SIGNING_KEY_ALIAS / SIGNING_KEY_PASSWORD.
+// Without either, the release build is left unsigned. Always sign with the same key, or updates won't install.
+def signing = new Properties()
+def signingFile = rootProject.file('.local/signing/signing.properties')
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+def sig = { String env, String key -> System.getenv(env) ?: signing.getProperty(key) }
+def storePath = sig('SIGNING_STORE_FILE', 'storeFile')
+
+// Semantic version (MAJOR.MINOR.PATCH): change only this. versionCode follows it (1.2.3 -> 10203) and so always grows.
+def appVersion = '0.0.1'
+def (vMajor, vMinor, vPatch) = appVersion.tokenize('.').collect { it as int }
+
+android {
+    namespace 'com.simplealphadroid'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.simplealphadroid'
+        minSdk 30
+        targetSdk 35
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName appVersion
+    }
+    signingConfigs {
+        release {
+            if (storePath) {
+                storeFile rootProject.file(storePath)
+                storePassword sig('SIGNING_STORE_PASSWORD', 'storePassword')
+                keyAlias sig('SIGNING_KEY_ALIAS', 'keyAlias')
+                keyPassword sig('SIGNING_KEY_PASSWORD', 'keyPassword')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (storePath) signingConfig signingConfigs.release
+        }
+        // same key for debug builds when available, so dev installs and released APKs update each other
+        debug {
+            if (storePath) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
+
+dependencies {
+    implementation 'io.nayuki:qrcodegen:1.8.0' // QR codes on the phone-1 screen (MIT)
+}

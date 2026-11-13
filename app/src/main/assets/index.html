@@ -1,0 +1,605 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0b0c">
+<title>SimpleAlphaDroid</title>
+<style>
+:root{--bg:#0b0b0c;--panel:#161618;--line:#2a2a2e;--fg:#e9e9ec;--dim:#8b8b93;--ok:#3ddc84;--warn:#ffb020;--bad:#ff5a5a;--acc:#4da3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;min-height:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+/* status bar */
+#bar{display:flex;align-items:center;gap:10px;padding:8px 12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
+#bar::-webkit-scrollbar{display:none}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);flex:none}
+.dot.on{background:var(--ok)}
+.chip{color:var(--dim)}.chip b{color:var(--fg);font-weight:600}
+#fmode{padding:2px 7px;border-radius:5px;background:var(--panel);border:1px solid var(--line);font-weight:600;cursor:pointer}
+#fmode.bbf{background:#3a2a00;border-color:#7a5a10;color:#ffd27a}
+#langb{margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--dim);font-size:12px;padding:3px 7px;cursor:pointer;flex:none}
+#langb b{color:var(--fg)}
+#gear{background:none;border:0;color:var(--dim);font-size:20px;padding:0 4px;cursor:pointer}
+/* live view */
+#main{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 10px 10px}
+#lvwrap{position:relative;width:100%;aspect-ratio:3/2;background:#000;border-radius:10px;overflow:hidden;touch-action:manipulation}
+#lv{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+#lvmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);text-align:center;padding:20px}
+#af{position:absolute;width:5.5%;aspect-ratio:1;border:2px solid rgba(255,255,255,.85);border-radius:3px;transform:translate(-50%,-50%);
+  pointer-events:none;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+#af.focused{border-color:var(--ok)}
+#af.fail{border-color:var(--bad)}
+#af.pending{border-style:dashed}
+/* Tracking area: the camera follows the subject but doesn't report where, so this is only the start point */
+#af.track{border-style:dashed}
+#af.track::after{content:attr(data-t);position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;white-space:nowrap;
+  font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:6px}
+#fps{position:absolute;right:8px;top:6px;font-size:11px;color:rgba(255,255,255,.6);text-shadow:0 0 3px #000}
+/* card panel (camera in USB Connection = MTP) */
+#cardp{position:absolute;inset:0;background:var(--panel);display:none;flex-direction:column;justify-content:center;gap:10px;padding:16px;text-align:center}
+#cardp.show{display:flex}
+#cardp h4{margin:0;font-size:15px}
+#cardp .sub{color:var(--dim);font-size:12px}
+#cstat{font-variant-numeric:tabular-nums}
+#cbar{height:8px;border-radius:4px;background:#0f0f11;border:1px solid var(--line);overflow:hidden;display:none}
+#cbar i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+#cbtns{display:flex;gap:8px;justify-content:center}
+#csync{background:#14304a;border-color:var(--acc)}
+/* controls */
+#ctl{display:flex;flex-direction:column;gap:10px;margin-top:auto}
+@media (orientation:portrait){#ctl{padding-bottom:6px}}
+.row{display:flex;gap:10px;align-items:center}
+.big{flex:1;height:76px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:17px;font-weight:700;
+  letter-spacing:.3px;touch-action:none;cursor:pointer}
+.big small{display:block;font-size:11px;font-weight:500;color:var(--dim);margin-top:3px}
+#afbtn.down{background:#163a26;border-color:var(--ok)}
+#shut{background:#3a1515;border-color:#6b2a2a}
+#shut.down{background:#c03030}
+.pill{height:40px;padding:0 16px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-weight:600;cursor:pointer}
+#bbf.on{background:#3a2a00;border-color:#b07d10;color:#ffd27a}
+#mf{display:none;gap:6px}
+#mf.show{display:flex}
+#mf button{flex:1;height:46px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:15px;font-weight:600;touch-action:none;cursor:pointer}
+#mf button:active{background:#25324a}
+#mf .lbl{color:var(--dim);font-size:11px;width:34px;text-align:center;flex:none}
+/* tools row: pills on one line, the hint on its own full-width line below */
+#tools{flex-wrap:wrap;row-gap:6px}
+#tools .pill{white-space:nowrap;flex:none}
+#hint{color:var(--dim);font-size:12px;min-height:16px;flex-basis:100%}
+#drive{height:40px;padding:0 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-weight:600;font-size:13px;cursor:pointer;flex:1 1 0;min-width:0}
+#drive.cont{background:#3a1515;border-color:#b04040;color:#ffc9c9}
+#queue{position:absolute;left:8px;top:6px;font-size:12px;font-weight:600;padding:3px 8px;border-radius:10px;background:rgba(0,0,0,.65);color:#fff;display:none;font-variant-numeric:tabular-nums}
+#queue.show{display:block}#queue.burst{background:#c03030}
+#magb.on{background:#14304a;border-color:var(--acc);color:#cfe6ff}
+#mag{display:none;gap:6px;align-items:center}
+#mag.show{display:flex}
+#mag button{flex:1;height:46px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:17px;font-weight:700;touch-action:manipulation;cursor:pointer}
+#mag button:active{background:#25324a}
+#mag .lbl{color:var(--dim);font-size:12px;min-width:48px;text-align:center;flex:none;font-variant-numeric:tabular-nums}
+/* exposure steppers + locks */
+#xp{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.xp{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 4px 4px;text-align:center;min-width:0}
+.xp .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.xp .v{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;min-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xp .b{display:flex;gap:4px;margin-top:4px}
+.xp button{flex:1;min-width:0;height:36px;border-radius:8px;border:1px solid var(--line);background:#0f0f11;color:var(--fg);font-size:18px;font-weight:700;touch-action:manipulation;cursor:pointer}
+.xp button:active{background:#25324a}
+#locks{display:flex;gap:6px}
+#locks button{flex:1;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-weight:600;font-size:13px;cursor:pointer}
+#locks button.on{background:#14304a;border-color:var(--acc);color:#cfe6ff}
+#rec.on{background:#c03030;border-color:#ff6060;color:#fff}
+/* last shot thumbnail + viewer */
+#thumb{position:absolute;left:8px;bottom:8px;width:22%;max-width:120px;aspect-ratio:3/2;border-radius:6px;border:2px solid rgba(255,255,255,.85);
+  background:#000 center/cover no-repeat;display:none;cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.6);padding:0}
+#thumb.show{display:block}
+#viewer{position:fixed;inset:0;background:#000;z-index:6;display:none;flex-direction:column}
+#viewer.show{display:flex}
+#vtop,#vbot{display:flex;align-items:center;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:#0b0b0c}
+#vbot{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+#vname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-variant-numeric:tabular-nums}
+#vimgwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+#vimg{max-width:100%;max-height:100%;object-fit:contain}
+#vmsg{position:absolute;color:var(--dim)}
+#vbot .pill{flex:none}#vdls{flex:1;display:flex;gap:6px;min-width:0}
+#vdls a{flex:1;min-width:0;text-align:center;line-height:40px;text-decoration:none;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vdls a small{color:var(--dim);font-weight:500;margin-left:4px}
+/* PIN prompt (only when PIN mode is on, phone 1 > PIN for the remote) */
+#pin{position:fixed;inset:0;background:var(--bg);z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+#pin.show{display:flex}
+#pin input{font-size:32px;letter-spacing:12px;text-align:center;width:200px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+#pinmsg{color:var(--bad);min-height:18px}
+/* toast */
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;border:1px solid var(--line);
+  padding:9px 14px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+#toast.show{opacity:1}#toast.err{border-color:var(--bad);color:#ffb3b3}
+/* settings sheet */
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:5}
+#sheet.show{display:flex}
+#sheet .card{width:100%;max-width:520px;background:var(--panel);border-top-left-radius:16px;border-top-right-radius:16px;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+/* diagnostics */
+#diag{border-top:1px solid var(--line);padding-top:10px}
+#diag h4{margin:0 0 8px;font-size:14px}
+.dg{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.dg span:nth-child(odd){color:var(--dim);white-space:nowrap}
+.dg b{font-weight:600}.dg .bad{color:var(--bad)}.dg .warn{color:var(--warn)}.dg .good{color:var(--ok)}
+#dgbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#dgbtns .pill{height:36px;padding:0 12px;font-size:13px}
+#sheet h3{margin:0 0 12px;font-size:16px}
+.set{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.set select{background:#0f0f11;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;max-width:60%}
+.set a{color:var(--acc);text-decoration:none}
+/* landscape: live view left, controls right */
+@media (orientation:landscape) and (min-width:640px){
+  #main{flex-direction:row;align-items:flex-start}
+  #lvwrap{flex:1;width:auto;max-height:calc(100vh - 60px)}
+  #ctl{width:280px;flex:none}
+  .big{height:88px}
+}
+</style></head><body>
+<div id="app">
+  <div id="bar">
+    <span class="dot" id="conn"></span>
+    <span id="fmode">--</span>
+    <span class="chip" id="expo"></span>
+    <span class="chip">🔋 <b id="batt">--</b></span>
+    <button id="langb" aria-label="Language"></button>
+    <button id="gear" aria-label="Settings">⚙</button>
+  </div>
+  <div id="main">
+    <div id="lvwrap">
+      <img id="lv" alt="">
+      <div id="lvmsg">Connecting…</div>
+      <div id="cardp">
+        <h4>Camera card (MTP mode)</h4>
+        <div class="sub">Remote control is off in this mode. Switch the camera back to USB Connection: PC Remote to shoot.</div>
+        <div id="cstat">Reading the card…</div>
+        <div id="cbar"><i></i></div>
+        <div id="cbtns"><button class="pill" id="csync">Sync missing</button><button class="pill" id="ccancel">Cancel</button><button class="pill" id="crescan">Re-check</button></div>
+      </div>
+      <div id="af"></div>
+      <div id="fps"></div>
+      <div id="queue"></div>
+      <button id="thumb" aria-label="Last shot"></button>
+    </div>
+    <div id="ctl">
+      <div class="row" id="tools">
+        <button class="pill" id="bbf">BBF off</button>
+        <button class="pill" id="magb" aria-label="Focus magnifier">🔍</button>
+        <select id="drive" aria-label="Drive mode"></select>
+        <span id="hint">Tap the picture to move the focus point</span>
+      </div>
+      <div class="row">
+        <button class="big" id="afbtn">AF<small>hold to focus</small></button>
+        <button class="big" id="shut">Shutter<small>focus + shoot</small></button>
+      </div>
+      <div id="xp">
+        <div class="xp"><div class="k">Shutter</div><div class="v" id="xv-ss">--</div><div class="b"><button data-c="0xD20D" data-d="-1" aria-label="Slower">−</button><button data-c="0xD20D" data-d="1" aria-label="Faster">+</button></div></div>
+        <div class="xp"><div class="k">F</div><div class="v" id="xv-f">--</div><div class="b"><button data-c="0x5007" data-d="-1" aria-label="Wider">−</button><button data-c="0x5007" data-d="1" aria-label="Narrower">+</button></div></div>
+        <div class="xp"><div class="k">ISO</div><div class="v" id="xv-iso">--</div><div class="b"><button data-c="0xD21E" data-d="-1" aria-label="Lower ISO">−</button><button data-c="0xD21E" data-d="1" aria-label="Higher ISO">+</button></div></div>
+        <div class="xp"><div class="k">EV</div><div class="v" id="xv-ev">--</div><div class="b"><button data-c="0x5010" data-d="-1" aria-label="Darker">−</button><button data-c="0x5010" data-d="1" aria-label="Brighter">+</button></div></div>
+      </div>
+      <div id="locks">
+        <button data-lock="0xD2C3">AEL</button><button data-lock="0xD2C9">FEL</button><button data-lock="0xD2D9">AWBL</button><button id="rec">● REC</button>
+      </div>
+      <div class="row" id="mag">
+        <span class="lbl" id="magr">frame</span>
+        <button data-k="0xD2CF" aria-label="Move left">◀</button><button data-k="0xD2CD" aria-label="Move up">▲</button>
+        <button data-k="0xD2CE" aria-label="Move down">▼</button><button data-k="0xD2D0" aria-label="Move right">▶</button>
+        <button id="magx" aria-label="Exit magnifier">✕</button>
+      </div>
+      <div class="row" id="mf">
+        <span class="lbl">Near</span>
+        <button data-v="-7">«</button><button data-v="-3">‹‹</button><button data-v="-1">‹</button>
+        <button data-v="1">›</button><button data-v="3">››</button><button data-v="7">»</button>
+        <span class="lbl">Far</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="pin"><h3 style="margin:0">Enter the PIN</h3><div class="chip">Shown on phone 1 under "PIN for the remote"</div>
+  <input id="pinin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"><div id="pinmsg"></div>
+  <button class="pill" id="pingo">Unlock</button></div>
+<div id="viewer">
+  <div id="vtop"><span id="vname">--</span><span class="chip" id="vpos"></span><button class="pill" id="vclose" aria-label="Close">✕</button></div>
+  <div id="vimgwrap"><img id="vimg" alt=""><span id="vmsg"></span></div>
+  <div id="vbot"><button class="pill" id="vprev" aria-label="Newer">‹</button><span id="vdls"></span><button class="pill" id="vnext" aria-label="Older">›</button></div>
+</div>
+<div id="sheet"><div class="card">
+  <h3>Settings</h3>
+  <div class="set"><span>Live view quality</span>
+    <select id="lvq"><option value="small">Small — smooth on weak Wi-Fi</option><option value="med">Medium — 1024 px</option><option value="full">Full — camera original</option></select></div>
+  <div class="set"><span>Focus mode</span>
+    <select id="fmsel"><option value="">(from camera)</option><option value="2">AF-S</option><option value="0x8004">AF-C</option><option value="0x8005">AF-A</option><option value="0x8006">DMF</option><option value="1">MF</option></select></div>
+  <div class="set"><span>Focus area</span>
+    <select id="farea"><option value="">(from camera)</option><option value="0x101">Flexible Spot S</option><option value="0x102">Flexible Spot M</option><option value="0x103">Flexible Spot L</option><option value="0x104">Expand Flexible Spot</option><option value="3">Center</option><option value="2">Zone</option><option value="1">Wide</option>
+      <option value="0x204" data-trk>Tracking: Flexible Spot S</option><option value="0x205" data-trk>Tracking: Flexible Spot M</option>
+      <option value="0x206" data-trk>Tracking: Flexible Spot L</option><option value="0x207" data-trk>Tracking: Expand Flexible Spot</option>
+      <option value="0x203" data-trk>Tracking: Center</option><option value="0x202" data-trk>Tracking: Zone</option><option value="0x201" data-trk>Tracking: Wide</option></select></div>
+  <div class="set"><span>Camera</span><span id="camname" class="chip">--</span></div>
+  <div id="diag">
+    <h4>Diagnostics</h4>
+    <div class="dg" id="dg"><span>Loading…</span><span></span></div>
+    <div id="dgbtns"><button class="pill" id="dgspeed">Test Wi-Fi speed</button><button class="pill" id="dgcopy">Copy report</button><a class="pill" id="dgsave" style="line-height:36px;text-decoration:none;color:var(--fg)">Save report</a></div>
+  </div>
+  <div class="set"><span>Troubleshooting</span><a href="/debug">Debug page →</a></div>
+  <div class="set"><span></span><button class="pill" id="closeSheet">Close</button></div>
+</div></div>
+<script>
+const $=id=>document.getElementById(id);
+
+// ---------- language: Vietnamese (default) / English, remembered per browser ----------
+let LANG='vi';try{if(localStorage.getItem('lang')==='en')LANG='en'}catch(e){}
+const L=(en,vi)=>LANG==='vi'?vi:en; // text built in JS
+// fixed page text (text nodes and aria-labels), keyed by the English original
+const VI={'Connecting…':'Đang kết nối…','Camera card (MTP mode)':'Thẻ nhớ máy ảnh (chế độ MTP)',
+  'Remote control is off in this mode. Switch the camera back to USB Connection: PC Remote to shoot.':'Không điều khiển được ở chế độ này. Chuyển máy ảnh về USB Connection: PC Remote để chụp.',
+  'Reading the card…':'Đang đọc thẻ nhớ…','Sync missing':'Đồng bộ ảnh thiếu','Cancel':'Hủy','Re-check':'Kiểm tra lại',
+  'Tap the picture to move the focus point':'Chạm vào ảnh để dời điểm lấy nét','Shutter':'Tốc độ','Near':'Gần','Far':'Xa','frame':'khung',
+  'Enter the PIN':'Nhập mã PIN','Shown on phone 1 under "PIN for the remote"':'Hiện trên điện thoại chính, mục "Mã PIN điều khiển"','Unlock':'Mở khóa',
+  'Settings':'Cài đặt','Live view quality':'Chất lượng xem trực tiếp','Small — smooth on weak Wi-Fi':'Nhỏ — mượt khi Wi-Fi yếu',
+  'Medium — 1024 px':'Vừa — 1024 px','Full — camera original':'Đầy đủ — gốc từ máy ảnh','Focus mode':'Chế độ lấy nét',
+  '(from camera)':'(theo máy ảnh)','Focus area':'Vùng lấy nét','Center':'Trung tâm','Zone':'Vùng','Wide':'Rộng','Camera':'Máy ảnh',
+  'Diagnostics':'Chẩn đoán','Loading…':'Đang tải…','Test Wi-Fi speed':'Đo tốc độ Wi-Fi','Copy report':'Sao chép báo cáo',
+  'Save report':'Lưu báo cáo','Troubleshooting':'Khắc phục sự cố','Debug page →':'Trang gỡ lỗi →','Close':'Đóng','Language':'Ngôn ngữ',
+  'Last shot':'Ảnh vừa chụp','Focus magnifier':'Phóng to lấy nét','Slower':'Chậm hơn','Faster':'Nhanh hơn','Wider':'Mở khẩu',
+  'Narrower':'Khép khẩu','Lower ISO':'Giảm ISO','Higher ISO':'Tăng ISO','Darker':'Tối hơn','Brighter':'Sáng hơn','Move left':'Sang trái',
+  'Move up':'Lên','Move down':'Xuống','Move right':'Sang phải','Exit magnifier':'Thoát phóng to','Newer':'Mới hơn','Older':'Cũ hơn','Drive mode':'Chế độ chụp'};
+function applyLang(){
+  document.documentElement.lang=LANG;
+  // #afbtn/#shut are drawn by bigBtns() (their text depends on BBF)
+  const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentNode.closest('script,style,#afbtn,#shut')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  for(let n;(n=w.nextNode());){const en=n.__en??(n.__en=n.nodeValue),k=en.trim();if(k&&VI[k])n.nodeValue=LANG==='vi'?en.replace(k,VI[k]):en}
+  document.querySelectorAll('[aria-label]').forEach(e=>{const en=e.dataset.en??(e.dataset.en=e.getAttribute('aria-label'));if(VI[en])e.setAttribute('aria-label',LANG==='vi'?VI[en]:en)});
+  $('langb').innerHTML=LANG==='vi'?'<b>VI</b> · EN':'VI · <b>EN</b>';
+  driveOpts();
+  bigBtns();
+}
+// drive mode 0x5013 (settable with 0x9205; speeds measured on the A6400 2026-11-13)
+const DRIVES=[[1,'Single','Chụp đơn'],[0x8012,'Burst 3 fps','Liên tiếp 3 fps'],[0x8015,'Burst 6 fps','Liên tiếp 6 fps'],
+  [2,'Burst 8 fps','Liên tiếp 8 fps'],[0x8010,'Burst 11 fps','Liên tiếp 11 fps']];
+const isCont=v=>v!=null&&v!==1&&DRIVES.some(d=>d[0]===v);
+function driveOpts(){
+  const s=$('drive');
+  s.innerHTML=DRIVES.map(d=>'<option value="'+d[0]+'">'+L(d[1],d[2])+'</option>').join('')
+    +'<option value="" disabled>'+L('Other (set on camera)','Khác (đặt trên máy ảnh)')+'</option>';
+  syncDrive();
+}
+function syncDrive(){const v=pv('0x5013'),s=$('drive');if(document.activeElement===s)return;
+  s.value=v==null?'1':DRIVES.some(d=>d[0]===v)?String(v):'';s.classList.toggle('cont',isCont(v));s.disabled=!st.connected}
+$('langb').onclick=()=>{LANG=LANG==='vi'?'en':'vi';try{localStorage.setItem('lang',LANG)}catch(e){}
+  applyLang();render();if(dg)renderDiag();if($('viewer').classList.contains('show'))showShot(vi)};
+const FMODE={1:'MF',2:'AF-S',3:'Macro',0x8004:'AF-C',0x8005:'AF-A',0x8006:'DMF',0x8007:'MF-R',0x8009:'PF'};
+const FAREA={1:'Wide',2:'Zone',3:'Center',0x101:'Flex S',0x102:'Flex M',0x103:'Flex L',0x104:'Exp. Flex',0x105:'Flex',
+  0x201:'Trk Wide',0x202:'Trk Zone',0x203:'Trk Center',0x204:'Trk Flex S',0x205:'Trk Flex M',0x206:'Trk Flex L',0x207:'Trk Exp. Flex'};
+// Tracking areas 0x201-0x207 are offered by the camera only in AF-C (verified 2026-11-13: 0x204 set over USB, the camera's
+// box followed the subject). Order assumed to match Sony's menu (Wide, Zone, Center, Flex S/M/L, Expand).
+const isTrk=fa=>fa>=0x201&&fa<=0x207;
+const tapFocus=fa=>(fa>=0x101&&fa<=0x105)||(fa>=0x204&&fa<=0x207); // areas that take a tapped point
+const PROG={1:'M',2:'P',3:'A',4:'S',0x8000:'iAuto',0x8001:'iAuto+'};
+let st={connected:false,bbf:false,props:{}}, lvOn=false, lastLvFrameAt=0, pendingAf=null;
+const locks={};
+
+// ---------- helpers ----------
+function q(o){return Object.entries(o||{}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')}
+let toastT;
+function toast(msg,err){const t=$('toast');t.textContent=msg;t.className='show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='',err?3500:1600)}
+// PIN mode: any 401 shows the PIN screen; a correct PIN sets a cookie and the page reloads
+function needPin(){if(!$('pin').classList.contains('show')){$('pin').classList.add('show');setTimeout(()=>$('pinin').focus(),50)}}
+const NOCONN=()=>L('No connection to phone 1','Không kết nối được điện thoại chính');
+function pinErr(m){const w=/Wait (\d+) s/.exec(m||'');
+  return w?L('Too many wrong PINs. Wait '+w[1]+' s.','Sai quá nhiều lần. Chờ '+w[1]+' giây.'):L('Wrong PIN','Sai mã PIN')}
+async function sendPin(){const v=$('pinin').value.trim();if(v.length!==4){$('pinmsg').textContent=L('4 digits','4 chữ số');return}
+  try{const j=await (await fetch('/api/login?pin='+encodeURIComponent(v),{method:'POST'})).json();
+    if(j.ok)location.reload();else{$('pinmsg').textContent=pinErr(j.msg);$('pinin').value=''}}catch(e){$('pinmsg').textContent=NOCONN()}}
+$('pingo').onclick=sendPin;$('pinin').addEventListener('input',()=>{if($('pinin').value.length===4)sendPin()});
+async function api(cmd,o){
+  try{const r=await fetch('/api/'+cmd+'?'+q(o),{method:'POST'});if(r.status===401){needPin();return null}const j=await r.json();
+    if(j.ok===false){toast(cmd+': '+(j.codeName||j.msg||L('failed','lỗi')),true)}return j}
+  catch(e){toast(NOCONN(),true);return null}
+}
+function pv(code){const p=st.props&&st.props[code];if(!p)return null;const m=/\((-?\d+)\)/.exec(p.v);return m?Number(m[1]):null}
+function fmtShutter(v){if(v==null)return'';if(v===0)return'BULB';const n=v>>>16,d=v&0xFFFF;if(!d)return'';
+  if(n===1&&d>1)return'1/'+d;const s=n/d;return(Number.isInteger(s)?s:s.toFixed(1))+'"'}
+function fmtF(v){return v?'f/'+(v/100).toFixed(v%100===0?0:1).replace(/\.0$/,''):''}
+function fmtIso(v){if(v==null)return'';const x=v&0xFFFFFF;return x===0xFFFFFF?'ISO AUTO':'ISO '+x}
+function fmtEv(v){if(v==null)return'';const s=(v<<16>>16)/1000;return(s>0?'+':s<0?'':'±')+s.toFixed(1)}
+
+// ---------- live view ----------
+function lvq(){return $('lvq').value}
+function lvUrl(){return '/stream?q='+lvq()+'&t='+Date.now()}
+function startLv(){lvOn=true;$('lv').src=lvUrl()}
+$('lv').onload=()=>{lastLvFrameAt=Date.now();$('lvmsg').style.display='none'};
+$('lv').onerror=()=>{if(lvOn)setTimeout(()=>{if(lvOn)$('lv').src=lvUrl()},1500)};
+// MJPEG <img> doesn't fire onload per frame on every browser; the status poll also reports camera fps.
+
+// ---------- focus point ----------
+// The camera's AF grid (prop 0xD232) uses square units: x 0..639 spans the picture width and y uses the SAME unit
+// from the top edge, so a 3:2 picture is only ~426 units tall (not 480). Measured on the A6400 2026-11-07 against
+// the rule-of-thirds grid: (213,160) and (427,320) land on the thirds crossings only with this mapping.
+// Box width as a fraction of picture width per Focus Area (0xD22C). S measured (~5.5%); M/L are estimates.
+const AF_BOX={0x0101:.055,0x0102:.08,0x0103:.11,0x0104:.055,0x0105:.08,0x0204:.055,0x0205:.08,0x0206:.11,0x0207:.055};
+let afLast=null;
+function imgRect(){ // displayed picture inside #lvwrap (object-fit:contain), px relative to the wrap
+  const w=$('lvwrap').getBoundingClientRect(),i=$('lv'),ar=(i.naturalWidth&&i.naturalHeight)?i.naturalWidth/i.naturalHeight:1.5;
+  let dw=w.width,dh=w.width/ar;if(dh>w.height){dh=w.height;dw=dh*ar}
+  return{x:(w.width-dw)/2,y:(w.height-dh)/2,w:dw,h:dh,gh:640/ar,wr:w};
+}
+function placeAf(x,y,cls){
+  afLast={x,y,cls};const a=$('af'),r=imgRect(),f=AF_BOX[pv('0xD22C')]||.055;
+  a.style.left=(r.x+x/640*r.w)+'px';a.style.top=(r.y+y/r.gh*r.h)+'px';a.style.width=Math.max(10,f*r.w)+'px';
+  a.style.display='block';
+  const trk=isTrk(pv('0xD22C'))&&cls!=='pending';a.className=(cls||'')+(trk?' track':'');
+  a.dataset.t=trk?L('start · tracking on camera','điểm bắt đầu · theo dõi trên máy ảnh'):''}
+window.addEventListener('resize',()=>{if(afLast)placeAf(afLast.x,afLast.y,afLast.cls)});
+$('lvwrap').addEventListener('click',e=>{
+  if(!st.connected)return;
+  const fa=pv('0xD22C');if(isTrk(fa)&&!tapFocus(fa))return; // Tracking Wide/Zone/Center: no start point to set
+  const r=imgRect();
+  const px=e.clientX-r.wr.left-r.x,py=e.clientY-r.wr.top-r.y;
+  if(px<0||py<0||px>r.w||py>r.h)return; // tap on the black bars
+  const x=Math.max(0,Math.min(639,Math.round(px/r.w*640)));
+  const y=Math.max(0,Math.min(Math.floor(r.gh)-1,Math.round(py/r.h*r.gh)));
+  pendingAf={x,y,t:Date.now()};placeAf(x,y,'pending');
+  api('afpos',{x,y});
+});
+
+// ---------- hold buttons ----------
+function holdButton(el,down,up){
+  let isDown=false;
+  el.addEventListener('pointerdown',e=>{e.preventDefault();if(isDown)return;isDown=true;el.classList.add('down');el.setPointerCapture&&el.setPointerCapture(e.pointerId);down()});
+  const rel=()=>{if(!isDown)return;isDown=false;el.classList.remove('down');up()};
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t=>el.addEventListener(t,rel));
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+}
+let afVia='s1';
+holdButton($('afbtn'),()=>{afVia=st.bbf?'afon':'s1';api(afVia,{down:1})},()=>api(afVia,{down:0}));
+let shooting=false,burstDown=null,burstPing=null;
+holdButton($('shut'),async()=>{
+  if(isCont(pv('0x5013'))){ // continuous drive: the camera fires while the button is held
+    // keep-alive: phone 1 lets go of the shutter if these stop for 1.5 s (Wi-Fi drop, tab closed)
+    burstPing=setInterval(()=>fetch('/api/burstalive',{method:'POST'}).catch(()=>{}),400);
+    burstDown=api('burst',{down:1});return}
+  if(shooting)return;shooting=true;
+  const r=await api(st.bbf?'shutter':'shoot');shooting=false;
+  if(r&&r.ok!==false)toast(/focus=FAILED/.test(r.msg||'')?L('⚠ Focus failed — camera may not have fired','⚠ Lấy nét thất bại — máy có thể đã không chụp')
+    :/focus=timeout/.test(r.msg||'')?L('⚠ Shot without focus confirmation (AF w/ shutter Off?)','⚠ Đã chụp nhưng chưa xác nhận lấy nét (AF w/ shutter đang Off?)')
+    :L('📷 Shot','📷 Đã chụp'));
+},async()=>{
+  if(!burstDown)return;
+  clearInterval(burstPing);const d=burstDown;burstDown=null;
+  await d; // release only after the press reached phone 1, so a quick tap can't leave it held
+  const r=await api('burst',{down:0});
+  if(r&&/^cancelled/.test(r.msg||''))toast(L('Released before focus — no shot','Thả tay trước khi lấy nét xong — không chụp'));
+});
+$('drive').onchange=async()=>{const v=$('drive').value;if(!v)return;$('drive').blur();
+  const r=await api('set',{code:'0x5013',value:v,size:2});
+  if(r&&r.ok!==false)toast(isCont(Number(v))?L('Hold Shutter to shoot a burst','Giữ nút Chụp để chụp liên tiếp'):L('Single shot','Chụp đơn'))};
+$('bbf').onclick=async()=>{const want=!st.bbf;const r=await api('bbf',{on:want?1:0});if(r&&r.ok!==false){st.bbf=want;render();
+  toast(want?L('Back-button focus ON','Lấy nét bằng nút sau: BẬT'):L('Back-button focus OFF','Lấy nét bằng nút sau: TẮT'))}};
+document.querySelectorAll('#mf button').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();api('nearfar',{v:b.dataset.v})}));
+// exposure: one camera step per tap (shutter + = faster, F + = narrower, ISO - below 100 = AUTO)
+document.querySelectorAll('#xp button').forEach(b=>b.addEventListener('click',()=>{if(st.connected)api('expo',{code:b.dataset.c,dir:b.dataset.d})}));
+// AEL/FEL/AWBL: tap = press and keep held (locked), tap again = release
+document.querySelectorAll('#locks [data-lock]').forEach(b=>b.addEventListener('click',async()=>{
+  const c=b.dataset.lock,on=!locks[c];const r=await api('ctrl',{code:c,value:on?2:1,size:2});
+  if(r&&r.ok!==false){locks[c]=on;b.classList.toggle('on',on);toast(b.textContent+(on?L(' locked',' đã khóa'):L(' released',' đã mở')))}}));
+// focus magnifier (0xD2CB steps: frame -> 5.9x -> 11.7x -> off; 0xD2CC exits; 0xD2CD-D0 move the area).
+// Status 0xD22D (0 off, 1 choosing area, 2 magnified), ratio 0xD22F x10. Codes from libgphoto2/alphawire/SonyAlphaUSB.
+$('magb').onclick=async()=>{if(!st.connected)return;const before=pv('0xD22D');await api('press',{code:'0xD2CB'});
+  setTimeout(()=>{if(pv('0xD22D')===before&&before===0)toast(L('Magnifier not available (AF-C? switch to AF-S/MF)','Không phóng to được (đang AF-C? chuyển sang AF-S/MF)'),true)},1200)};
+$('magx').onclick=()=>api('press',{code:'0xD2CC'});
+document.querySelectorAll('#mag [data-k]').forEach(b=>b.addEventListener('click',()=>api('press',{code:b.dataset.k})));
+$('rec').onclick=async()=>{const r=await api('press',{code:'0xD2C8'});if(r&&r.ok!==false)toast(L('Movie button pressed','Đã bấm nút quay phim'))};
+
+// ---------- shots (saved on phone 1 in Download/A6400; preview = camera's embedded JPEG) ----------
+let shots=[],vi=0,savedSeen=-1,shotFolder='';
+function fmtSize(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}
+const shotUrl=b=>'/shot.jpg?base='+encodeURIComponent(b);
+async function loadShots(){
+  try{const j=await (await fetch('/api/shots',{cache:'no-store'})).json();shots=j.shots||[];shotFolder=j.folder||''}catch(e){return}
+  const t=$('thumb');
+  if(shots.length){t.style.backgroundImage='url("'+shotUrl(shots[0].base)+'")';t.classList.add('show')}else t.classList.remove('show');
+  if($('viewer').classList.contains('show'))showShot(Math.min(vi,shots.length-1));
+}
+function showShot(i){
+  if(!shots.length){$('vname').textContent=L('No shots yet','Chưa có ảnh');$('vimg').removeAttribute('src');$('vpos').textContent='';return}
+  vi=Math.max(0,Math.min(shots.length-1,i));const s=shots[vi];
+  $('vname').textContent=s.base;$('vpos').textContent=(vi+1)+'/'+shots.length;$('vpos').title=L('Saved on phone 1 in ','Lưu trên điện thoại chính tại ')+shotFolder;
+  $('vmsg').textContent=L('Loading…','Đang tải…');$('vimg').src=shotUrl(s.base);
+  // one download button per stored version: RAW/ JPEG/ Preview/ on phone 1
+  $('vdls').innerHTML='';
+  [['raw','RAW'],['jpeg','JPEG'],['preview',L('Preview','Xem trước')]].forEach(([k,label])=>{const f=s[k];if(!f)return;
+    const a=document.createElement('a');a.className='pill';a.href='/shot?base='+encodeURIComponent(s.base)+'&kind='+k;
+    a.setAttribute('download',f.name);a.title=f.name;a.innerHTML=label+'<small>'+fmtSize(f.size)+'</small>';$('vdls').appendChild(a)});
+  $('vprev').disabled=vi===0;$('vnext').disabled=vi===shots.length-1;
+}
+$('vimg').onload=()=>$('vmsg').textContent='';
+$('vimg').onerror=()=>$('vmsg').textContent=L('No preview for this file','Tệp này không có ảnh xem trước');
+$('thumb').onclick=e=>{e.stopPropagation();$('viewer').classList.add('show');showShot(0)};
+$('vclose').onclick=()=>$('viewer').classList.remove('show');
+$('vprev').onclick=()=>showShot(vi-1);$('vnext').onclick=()=>showShot(vi+1);
+document.addEventListener('keydown',e=>{if(!$('viewer').classList.contains('show'))return;
+  if(e.key==='Escape')$('vclose').click();else if(e.key==='ArrowLeft')showShot(vi-1);else if(e.key==='ArrowRight')showShot(vi+1)});
+loadShots();
+
+// ---------- card sync (camera in MTP mode: copy card photos the phone doesn't have yet) ----------
+let cardScanned=false,lastCardDone=-1;
+function fmtGB(b){return b>=1073741824?(b/1073741824).toFixed(2)+' GB':fmtSize(b)}
+function renderCard(){
+  const c=st.card||{},on=!!st.mtp,busy=c.state==='scanning'||c.state==='syncing';
+  $('cardp').classList.toggle('show',on);
+  $('ctl').style.display=on?'none':''; // no remote control in MTP mode
+  if(!on)return;
+  $('lvmsg').style.display='none';
+  let t;
+  const reading=L('Reading the card…','Đang đọc thẻ nhớ…');
+  if(c.state==='scanning')t=reading;
+  else if(c.state==='syncing')t=L('Copying ','Đang chép ')+(c.done+c.failed+1)+' / '+c.missing+': '+c.current+' · '+fmtGB(c.bytes)+L(' of ',' / ')+fmtGB(c.missingBytes);
+  else if(c.photos<0)t=reading;
+  else{t=c.photos+L(' photos on the card · ',' ảnh trên thẻ · ')+(c.missing?c.missing+L(' missing on the phone (',' ảnh chưa có trên điện thoại (')+fmtGB(c.missingBytes)+')'
+      :L('all already on the phone','tất cả đã có trên điện thoại'));
+    if(c.videos)t+=' · '+c.videos+L(' videos skipped',' video bỏ qua');
+    if(c.state==='done'||c.state==='cancelled')t=L('Last sync '+c.state+': '+c.done+' copied'+(c.failed?', '+c.failed+' failed':''),
+      'Lần đồng bộ trước '+(c.state==='done'?'xong':'đã hủy')+': đã chép '+c.done+(c.failed?', lỗi '+c.failed:''))+'. '+t;
+    if(/^error/.test(c.state||''))t='⚠ '+c.state+'. '+t}
+  $('cstat').textContent=t;
+  const tot=c.missingBytes||0;$('cbar').style.display=c.state==='syncing'?'block':'none';
+  $('cbar').firstElementChild.style.width=(c.state==='syncing'&&tot?Math.min(100,c.bytes/tot*100):0)+'%';
+  $('csync').style.display=busy||!(c.missing>0)?'none':'';$('csync').textContent=L('Sync '+c.missing+' missing','Đồng bộ '+c.missing+' ảnh thiếu');
+  $('ccancel').style.display=c.state==='syncing'?'':'none';$('crescan').style.display=busy?'none':'';
+  if(c.done!==lastCardDone){lastCardDone=c.done;if(c.done>0)loadShots()}
+}
+$('csync').onclick=()=>api('cardsync');
+$('ccancel').onclick=()=>api('cardsync',{cancel:1});
+$('crescan').onclick=()=>api('card');
+
+// ---------- settings ----------
+try{const s=localStorage.getItem('lvq');if(s)$('lvq').value=s;else $('lvq').value='med'}catch(e){$('lvq').value='med'}
+$('lvq').onchange=()=>{try{localStorage.setItem('lvq',lvq())}catch(e){}if(lvOn)$('lv').src=lvUrl()};
+// focus mode: 0x500A is marked read-only (gs=0) but a plain 0x9205 set works (verified 2026-11-12, as gphoto2 does).
+// Tap the mode chip in the top bar to cycle AF-S -> AF-C -> MF; all modes are in the settings sheet.
+async function setFocusMode(v){const r=await api('set',{code:'0x500A',value:v,size:2});if(r&&r.ok!==false)toast(L('Focus mode: ','Chế độ lấy nét: ')+(FMODE[Number(v)]||v))}
+$('fmsel').onchange=()=>{const v=$('fmsel').value;if(v)setFocusMode(v)};
+$('fmode').onclick=()=>{if(!st.connected)return;if(st.bbf){toast(L('Turn BBF off to change the focus mode','Tắt BBF để đổi chế độ lấy nét'));return}
+  const order=[2,0x8004,1],cur=pv('0x500A'),i=order.indexOf(cur);setFocusMode(order[(i+1)%order.length])};
+$('farea').onchange=async()=>{const v=$('farea').value;if(!v)return;const r=await api('set',{code:'0xD22C',value:v});if(r&&r.ok!==false)toast(L('Focus area set','Đã đặt vùng lấy nét'))};
+$('gear').onclick=()=>{$('sheet').classList.add('show');diagPoll()};
+$('closeSheet').onclick=()=>$('sheet').classList.remove('show');
+$('sheet').addEventListener('click',e=>{if(e.target.id==='sheet')$('sheet').classList.remove('show')});
+
+// ---------- diagnostics (refreshes every 2 s while the sheet is open) ----------
+let dg=null,speed=null,ping=null,diagT=null;
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function cls(v,good,warn,lowIsGood){if(v==null||isNaN(v))return'';return lowIsGood?(v<=good?'good':v<=warn?'warn':'bad'):(v>=good?'good':v>=warn?'warn':'bad')}
+async function diagPoll(){
+  clearTimeout(diagT);if(!$('sheet').classList.contains('show'))return;
+  try{dg=await (await fetch('/api/diag',{cache:'no-store'})).json();renderDiag()}catch(e){$('dg').innerHTML='<span>'+L('Phone 1','Điện thoại chính')+'</span><b class="bad">'+L('not reachable','không kết nối được')+'</b>'}
+  diagT=setTimeout(diagPoll,2000);
+}
+function renderDiag(){
+  const d=dg||{},w=d.wifi||{},p=d.phone||{},lv=d.lv||{},u=d.usb||{},rows=[];
+  const add=(k,v)=>rows.push('<span>'+k+'</span><span>'+v+'</span>');
+  const notRun=L('not run','chưa đo');
+  add(L('Speed test','Đo tốc độ'),speed?(speed.err?'<b class="bad">'+esc(speed.err)+'</b>':'<b class="'+cls(speed.mbps,20,8)+'">'+speed.mbps.toFixed(1)+' Mbit/s</b> ('+speed.mb+L(' MB in ',' MB trong ')+speed.s.toFixed(1)+' s)'):notRun);
+  add('Ping',ping?'<b class="'+cls(ping.med,30,100,true)+'">'+ping.med+' ms</b>'+L(' median, ',' trung vị, ')+ping.max+L(' ms worst',' ms chậm nhất'):notRun);
+  add(L('Phone 1 Wi-Fi','Wi-Fi điện thoại chính'),w.connected?'<b class="'+cls(w.rssi,-60,-72)+'">'+w.rssi+' dBm</b> · '+esc(w.band)+L(' · link ',' · liên kết ')+w.linkMbps+' Mbit/s'
+    +(w.band==='2.4 GHz'?' <span class="warn">'+L('(2.4 GHz is slow; use 5 GHz if you can)','(2.4 GHz chậm; nên dùng 5 GHz nếu được)')+'</span>':''):(w.error?esc(w.error):L('not on Wi-Fi (hotspot?)','không dùng Wi-Fi (điểm phát sóng?)')));
+  add(L('Addresses','Địa chỉ'),(d.addrs||[]).map(a=>esc(a.ip)+' <span style="color:var(--dim)">'+esc(a.kind)+' '+esc(a.iface)+'</span>').join('<br>')||L('none','không có'));
+  add(L('Live view','Xem trực tiếp'),u.mode==='PC Remote'?L('camera ','máy ảnh ')+'<b>'+lv.cameraFps+' fps</b>'+L(' · sent ',' · gửi ')+'<b class="'+cls(lv.sentFps,15,8)+'">'+lv.sentFps+' fps</b> ('+lv.sentMbps+' Mbit/s, '+esc(lv.quality||'-')+')'
+    +L(' · frame age at send ',' · độ trễ khung khi gửi ')+lv.frameAgeMs+' ms':L('off (','tắt (')+esc(u.mode)+')');
+  add(L('Camera USB','USB máy ảnh'),'<b>'+esc(u.mode)+'</b>'+(u.failures?' · <span class="warn">'+u.failures+L(' USB errors',' lỗi USB')+'</span>':L(' · no USB errors',' · không có lỗi USB'))
+    +(u.lastShotMBps>0?L(' · last shot ',' · ảnh cuối ')+u.lastShotMBps+' MB/s':'')+(u.syncMBps>0?L(' · card sync ',' · đồng bộ thẻ ')+u.syncMBps+' MB/s':''));
+  const bat=pv('0xD218');
+  add(L('Camera battery','Pin máy ảnh'),bat!=null?bat+'%':'--');
+  add(L('Phone 1','Điện thoại chính'),(p.battery>=0?'<b class="'+cls(p.battery,40,20)+'">'+p.battery+'%</b>'+(p.charging?L(' charging',' đang sạc'):''):'')+' · <span class="'+cls(p.tempC,38,43,true)+'">'+p.tempC+' °C</span>'
+    +' · '+(p.freeBytes?(p.freeBytes/1073741824).toFixed(1)+L(' GB free',' GB trống'):'')+L(' · app memory ',' · bộ nhớ ứng dụng ')+p.heapMB+'/'+p.heapMaxMB+' MB');
+  add(L('Photo folder','Thư mục ảnh'),esc(p.folder||'--'));
+  add(L('Log','Nhật ký'),(d.log?d.log.errors:0)?'<span class="warn">'+d.log.errors+L(' errors',' lỗi')+'</span>'+L(' since app start',' từ khi mở ứng dụng'):L('no errors','không có lỗi'));
+  $('dg').innerHTML=rows.join('');
+}
+async function runSpeed(){
+  const b=$('dgspeed');b.disabled=true;b.textContent=L('Testing…','Đang đo…');
+  try{ // ping: 10 tiny round trips, then an 8 MB download
+    const ts=[];for(let i=0;i<10;i++){const t=performance.now();await fetch('/api/ping?'+i,{cache:'no-store'});ts.push(Math.round(performance.now()-t))}
+    ts.sort((a,c)=>a-c);ping={med:ts[5],max:ts[9],all:ts};renderDiag();
+    const mb=8,t0=performance.now(),r=await fetch('/speedtest?mb='+mb+'&t='+Date.now(),{cache:'no-store'});const n=(await r.arrayBuffer()).byteLength;
+    const s=(performance.now()-t0)/1000;speed={mb:n/1048576,s,mbps:n*8/1e6/s};
+  }catch(e){speed={err:L('failed: ','lỗi: ')+e}}
+  b.disabled=false;b.textContent=L('Test Wi-Fi speed','Đo tốc độ Wi-Fi');renderDiag();
+}
+$('dgspeed').onclick=runSpeed;
+async function report(){
+  let log='';try{log=await (await fetch('/log?n=200',{cache:'no-store'})).text()}catch(e){log='(log not reachable: '+e+')'}
+  return 'A6400 remote diagnostic report\n'+new Date().toString()+'\nBrowser: '+navigator.userAgent+'\nPage: '+location.href
+    +'\n\nSpeed test: '+JSON.stringify(speed)+'\nPing (ms): '+JSON.stringify(ping)+'\n\nDiag: '+JSON.stringify(dg,null,1)
+    +'\n\nStatus: '+JSON.stringify(st)+'\n\nLast 200 log lines:\n'+log;
+}
+$('dgcopy').onclick=async()=>{
+  const txt=await report();
+  const done=L('Report copied','Đã sao chép báo cáo');
+  try{await navigator.clipboard.writeText(txt);toast(done);return}catch(e){} // needs https; plain http falls back:
+  const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+  let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();toast(ok?done:L('Copy blocked: use Save report','Không sao chép được: dùng Lưu báo cáo'),!ok);
+};
+$('dgsave').onclick=async e=>{
+  e.preventDefault();const txt=await report(),a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download='a6400-report-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+};
+
+// ---------- status ----------
+function bigBtns(){
+  $('afbtn').innerHTML=(st.bbf?'AF-ON':'AF')+'<small>'+L('hold to focus','giữ để lấy nét')+'</small>';
+  $('shut').innerHTML=L('Shutter','Chụp')+'<small>'+(isCont(pv('0x5013'))?L('hold for burst','giữ để chụp liên tiếp')
+    :st.bbf?L('no refocus','không lấy nét lại'):L('focus + shoot','lấy nét + chụp'))+'</small>';
+}
+// shots still in the camera (0xD215: bit15 + count); a burst queues them and phone 1 downloads ~1 per 0.85 s (RAW)
+function renderQueue(){
+  const w=pv('0xD215'),n=(w!=null&&w!==0xFFFF&&(w&0x8000))?w&0x7FFF:0,q=$('queue');
+  q.classList.toggle('burst',!!st.burst);q.classList.toggle('show',st.connected&&(!!st.burst||n>0));
+  q.textContent=st.burst?L('● Burst','● Đang chụp liên tiếp'):L('Saving '+n+' to phone 1','Đang lưu '+n+' ảnh vào điện thoại chính');
+}
+function render(){
+  $('conn').className='dot'+(st.connected?' on':'');
+  const fm=pv('0x500A');
+  const fe=$('fmode');
+  if(st.bbf){fe.textContent='BBF';fe.className='bbf'}else{fe.textContent=FMODE[fm]||'--';fe.className=''}
+  const fa=pv('0xD22C');if(fa!=null&&FAREA[fa])fe.textContent+=' · '+FAREA[fa];
+  const parts=[PROG[pv('0x500E')]||'',fmtShutter(pv('0xD20D')),fmtF(pv('0x5007')),fmtIso(pv('0xD21E')),fmtEv(pv('0x5010'))].filter(Boolean);
+  $('expo').innerHTML=parts.map(p=>'<b>'+p+'</b>').join(' ');
+  $('xv-ss').textContent=fmtShutter(pv('0xD20D'))||'--';$('xv-f').textContent=fmtF(pv('0x5007'))||'--';
+  $('xv-iso').textContent=(fmtIso(pv('0xD21E'))||'--').replace('ISO ','');$('xv-ev').textContent=fmtEv(pv('0x5010'))||'--';
+  // lock buttons follow the camera's indicators (AE 0xD217, FEL 0xD21F, AWB 0xD24E: 1 off, 2 locked)
+  [['0xD2C3','0xD217'],['0xD2C9','0xD21F'],['0xD2D9','0xD24E']].forEach(([c,ind])=>{const v=pv(ind);if(v!=null){locks[c]=v===2;document.querySelector('[data-lock="'+c+'"]').classList.toggle('on',v===2)}});
+  const mr=pv('0xD21D');$('rec').classList.toggle('on',mr!=null&&mr!==0);
+  const b=pv('0xD218');$('batt').textContent=b!=null?b+'%':'--';
+  $('camname').textContent=st.model||'--';
+  $('bbf').textContent=st.bbf?'BBF on':'BBF off';$('bbf').className='pill'+(st.bbf?' on':'');
+  bigBtns();syncDrive();renderQueue();
+  const ms=pv('0xD22D')||0,mr2=pv('0xD22F')||0;$('magb').classList.toggle('on',ms!==0);$('mag').classList.toggle('show',ms!==0);
+  $('magr').textContent=ms===2&&mr2?(mr2/10).toFixed(1)+'×':L('frame','khung');$('magb').disabled=pv('0xD233')===0;
+  const nf=pv('0xD235');$('mf').className='row'+((st.bbf||nf===1)?' show':'');
+  const pcOnly=pv('0xD222')===1;$('hint').style.color=pcOnly?'var(--warn)':'';
+  $('hint').textContent=!st.connected?L('Camera not connected','Chưa kết nối máy ảnh')
+    :pcOnly?L('Photos are NOT saved to the card: camera MENU → PC Remote Settings → Still Img. Save Dest. → PC+Camera','Ảnh KHÔNG được lưu vào thẻ: MENU máy ảnh → PC Remote Settings → Still Img. Save Dest. → PC+Camera')
+    :isTrk(fa)?(tapFocus(fa)?L('Tracking: tap the subject, hold AF. The camera’s screen shows the box following it.','Theo dõi: chạm vào chủ thể, giữ AF. Màn hình máy ảnh hiện khung bám theo.')
+      :L('Tracking: hold AF. The camera picks the subject (see its screen).','Theo dõi: giữ AF. Máy ảnh tự chọn chủ thể (xem màn hình máy ảnh).'))
+    :(fa!=null&&!tapFocus(fa)?L('Tap-to-focus needs Flexible Spot (⚙)','Chạm lấy nét cần Flexible Spot (⚙)'):L('Tap the picture to move the focus point','Chạm vào ảnh để dời điểm lấy nét'));
+  // Tracking options only exist in AF-C
+  const afc=fm===0x8004;document.querySelectorAll('#farea [data-trk]').forEach(o=>{o.hidden=!afc;o.disabled=!afc});
+  // focus point: trust the camera's reported position unless a tap is still in flight
+  const ap=pv('0xD232'),fi=pv('0xD213');
+  if(pendingAf&&Date.now()-pendingAf.t<1500){/* keep the dashed marker */}
+  else if(st.mtp||!st.connected||(isTrk(fa)&&!tapFocus(fa))){$('af').style.display='none';afLast=null} // Tracking Wide/Zone/Center: camera picks the subject
+  else if(ap!=null){pendingAf=null;const cls=(fi===2||fi===6)?'focused':(fi===3||fi===7)?'fail':'';placeAf(ap>>>16,ap&0xFFFF,cls)}
+  renderCard();
+  $('fps').textContent=st.connected&&st.fps?Math.round(st.fps)+' fps':'';
+  if(!st.connected){$('lvmsg').style.display='flex';$('lvmsg').textContent=L('Camera not connected — check the USB cable and that the camera is on (USB Connection: PC Remote).',
+    'Chưa kết nối máy ảnh — kiểm tra cáp USB và máy ảnh đã bật (USB Connection: PC Remote).')}
+}
+let failCount=0;
+async function poll(){
+  try{
+    const sr=await fetch('/api/status',{cache:'no-store'});
+    if(sr.status===401){needPin();setTimeout(poll,2000);return}
+    const s=await sr.json();
+    failCount=0;
+    const was=st.connected;st=s;render();
+    if(s.saved!=null&&s.saved!==savedSeen){const first=savedSeen<0;savedSeen=s.saved;if(!first)loadShots()}
+    if(s.connected&&!s.mtp&&!lvOn)startLv();
+    if(s.mtp&&lvOn){lvOn=false;$('lv').removeAttribute('src')}
+    if(s.mtp&&!cardScanned&&s.card&&s.card.state==='idle'){cardScanned=true;api('card')}
+    if(!s.mtp)cardScanned=false;
+    if(!s.connected&&was){lvOn=false;$('lv').removeAttribute('src')}
+    if(!s.connected&&!was&&!poll.tried){poll.tried=true;api('connect')}
+  }catch(e){
+    if(++failCount===3){st.connected=false;render();$('lvmsg').style.display='flex';$('lvmsg').textContent=L('Phone 1 not reachable. Is this device still on phone 1’s Wi-Fi? (If it said "no internet" and switched away, rejoin and choose Stay connected.) A VPN on this device can also block it.',
+      'Không kết nối được điện thoại chính. Thiết bị này còn ở Wi-Fi của điện thoại chính không? (Nếu báo "không có internet" rồi tự chuyển mạng, hãy vào lại và chọn Vẫn kết nối.) VPN trên thiết bị này cũng có thể chặn.')}
+  }
+  setTimeout(poll,500);
+}
+applyLang();
+poll();
+</script></body></html>

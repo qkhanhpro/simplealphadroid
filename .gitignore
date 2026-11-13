@@ -1,0 +1,20 @@
+# build output
+.gradle/
+build/
+app/build/
+build.log
+*.iml
+.idea/
+local.properties
+
+# private: never published (dev notes for Claude Code, see CLAUDE.local.md)
+.local/
+CLAUDE.md
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+
+# release signing: the keystore and its passwords stay off GitHub
+*.jks
+*.keystore
+signing.properties
