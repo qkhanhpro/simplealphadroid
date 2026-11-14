@@ -1,5 +1,11 @@
 # SimpleAlphaDroid
 
+
+
+https://github.com/user-attachments/assets/56512408-1b0d-452b-8be5-d4a56ebab3f8
+
+
+
 [English](#english) · [Tiếng Việt](#tiếng-việt)
 
 ## English
